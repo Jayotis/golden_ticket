@@ -37,27 +37,62 @@ This project is currently in **Open Beta**. The core functionality is in place, 
 
 Interested in contributing? Here’s how to get the project running.
 
-1.  **Prerequisites:**
-    * Flutter SDK (see `pubspec.yaml` for version)
-    * Android Studio or VS Code with the Flutter extension.
-    * A Firebase project set up with Firestore and Authentication.
+### 1. Prerequisites
+* Flutter SDK (see `pubspec.yaml` for version)
+* Android Studio or VS Code with the Flutter extension.
+* A Firebase project set up with Firestore and Authentication.
 
-2.  **Clone the Repository:**
+### 2. Environment Setup (for Debian/Ubuntu/Linux Mint)
+
+This project uses Firebase, which requires a specific set of command-line tools. Follow these steps to set up your environment.
+
+1.  **Install Node Version Manager (nvm):** The Firebase CLI requires a recent version of Node.js. `nvm` is the best way to manage this.
+    ```bash
+    curl -o- [https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh](https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh) | bash
+    ```
+    After this, **close and reopen your terminal**.
+
+2.  **Install and Use Node.js:** Use `nvm` to install and use the latest Long-Term Support (LTS) version of Node.js.
+    ```bash
+    nvm install --lts
+    nvm use --lts
+    ```
+
+3.  **Install Firebase Tools:** Use Node's package manager (`npm`) to install the Firebase CLI globally.
+    ```bash
+    npm install -g firebase-tools
+    ```
+
+4.  **Install FlutterFire CLI:** This is the Flutter-specific helper tool for Firebase.
+    ```bash
+    dart pub global activate flutterfire_cli
+    ```
+
+5.  **Log in to Firebase:** Connect the CLI to your Firebase account. This will open a browser window for you to sign in.
+    ```bash
+    firebase login
+    ```
+
+### 3. Project Setup
+
+1.  **Clone the Repository:**
     ```bash
     git clone [https://github.com/Jayotis/Golden-Ticket.git](https://github.com/Jayotis/Golden-Ticket.git)
     cd Golden-Ticket
     ```
 
-3.  **Setup Firebase (Android):**
-    * Obtain the `google-services.json` file from your Firebase project settings.
-    * Place it in the `android/app/` directory.
+2.  **Configure Firebase for the Project:** Run `flutterfire` to connect your project to your Firebase backend. It will prompt you to select your Firebase project from a list.
+    ```bash
+    flutterfire configure
+    ```
+    This will generate a `lib/firebase_options.dart` file. This file is already in `.gitignore` and should not be committed.
 
-4.  **Install Dependencies:**
+3.  **Install Dependencies:**
     ```bash
     flutter pub get
     ```
 
-5.  **Run the App:**
+4.  **Run the App:**
     * Connect a device or start an emulator.
     * Run `flutter run` or use the "Run" command in your IDE.
     * **Note:** To create release builds, you will need to set up your own `android/key.properties` file with a signing key. The repository is configured to allow debug builds without it.

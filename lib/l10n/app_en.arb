@@ -1,0 +1,6 @@
+{
+  "appTitle": "golden_ticket",
+  "@appTitle": {
+    "description": "The title of the application"
+  }
+}

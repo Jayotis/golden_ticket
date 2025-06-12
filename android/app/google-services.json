@@ -1,13 +1,13 @@
 {
   "project_info": {
-    "project_number": "1015946217750",
-    "project_id": "golden-ticket-app",
-    "storage_bucket": "golden-ticket-app.firebasestorage.app"
+    "project_number": "703382744473",
+    "project_id": "golden-ticket-org",
+    "storage_bucket": "golden-ticket-org.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:1015946217750:android:1dac7c072a9107fb88a837",
+        "mobilesdk_app_id": "1:703382744473:android:d724ea2c728b6eacd73708",
         "android_client_info": {
           "package_name": "org.golden_ticket.golden_ticket"
         }
@@ -15,26 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyDzT33TFBODz3oYJg0lIg1hq8RQDOoK1y8"
-        }
-      ],
-      "services": {
-        "appinvite_service": {
-          "other_platform_oauth_client": []
-        }
-      }
-    },
-    {
-      "client_info": {
-        "mobilesdk_app_id": "1:1015946217750:android:0ab011659179a44e88a837",
-        "android_client_info": {
-          "package_name": "page.governance.golden_ticket"
-        }
-      },
-      "oauth_client": [],
-      "api_key": [
-        {
-          "current_key": "AIzaSyDzT33TFBODz3oYJg0lIg1hq8RQDOoK1y8"
+          "current_key": "AIzaSyD0cYyGKz9_shwiKVA1R3IVUxWu0Yqh-Y0"
         }
       ],
       "services": {

@@ -20,7 +20,7 @@ import 'routes.dart'; // For Back button navigation
 /// A screen where users can manage their "Ingot Crucible" by:
 /// 1. Smelting "Ingots" (combinations) from the server.
 /// 2. Storing Ingots in a local collection.
-/// 3. Placing Ingots from the collection onto the Crucible.
+/// 3. Placing Ingots from the collection onto the 11111111111111111111111111111111111Crucible.
 /// 4. Forging the final Crucible tickets via API call.
 class TheForgeScreen extends StatefulWidget {
   const TheForgeScreen({super.key});

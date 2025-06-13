@@ -8,7 +8,7 @@ import 'package:provider/provider.dart';
 
 // --- Project-Specific Screen Imports ---
 // Import the various screens used within the application.
-import 'golden_ticket/the_forge_screen.dart';   // Screen for forging tickets.
+import 'golden_ticket/the_smelter.dart';   // Screen for forging tickets.
 import 'golden_ticket/auth/auth_state.dart';     // Authentication state management class.
 import 'golden_ticket/main_screen.dart';         // The main screen shown after sign-in or as default.
 import 'settings/settings_controller.dart';      // Controller for managing app settings (like theme).
@@ -110,14 +110,14 @@ class MyApp extends StatelessWidget {
                     case Routes.gameSelector:
                     // Navigate to the Game Selector screen.
                       return const GameSelectorScreen();
-                    case Routes.theForge:
+                    case Routes.forge:
                     // Navigate to The Forge screen.
                     // Arguments ('gameName', 'nextDrawDate') are expected to be passed via routeSettings.arguments
                     // and are handled internally within TheForgeScreen's initState/didChangeDependencies.
-                      return const TheForgeScreen();
+                     // return const TheForgeScreen();
                     case Routes.theSmelter:
                     // Navigate to The Smelter screen.
-                      return const TheSmelter();
+                      return const SmelterScreen();
                     case Routes.verifyResults:
                     // Navigate to the Verify Results screen (purpose might be specific/future).
                       return const VerifyResultsScreen();

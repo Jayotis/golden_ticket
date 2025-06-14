@@ -1,121 +1,67 @@
 import 'package:flutter/material.dart';
-// Import the http package for making API calls.
 import 'package:http/http.dart' as http;
-// Import dart:convert for JSON encoding/decoding.
 import 'dart:convert';
-// Import Provider for accessing shared state like AuthState.
 import 'package:provider/provider.dart';
-// Import dart:async for handling asynchronous operations like TimeoutException.
 import 'dart:async';
-// Import logging framework.
 import 'package:logging/logging.dart';
 
-// --- Project-Specific Imports ---
-// Import the authentication state management class.
-import 'auth/auth_state.dart'; // Ensure this path is correct
-// Import utility for setting up loggers.
-import 'logging_utils.dart'; // Ensure this path is correct
-// Import named route constants.
-import 'routes.dart'; // Ensure this path is correct
-// Import the database helper for local profile/progress updates upon sign-in.
-import 'database_helper.dart'; // Ensure this path is correct
-// Import the push notification service.
-import '../../push_notification_service.dart'; // Ensure this path is correct
+import 'auth/auth_state.dart';
+import 'logging_utils.dart';
+import 'routes.dart';
+import 'database_helper.dart';
+import '../../push_notification_service.dart';
 
-/// A StatefulWidget representing the Sign In screen.
-/// Allows users to enter their credentials and attempt to log in.
 class SignInScreen extends StatefulWidget {
   const SignInScreen({super.key});
-
-  // Route name used for navigation to this screen.
   static const routeName = '/sign-in';
 
   @override
   SignInScreenState createState() => SignInScreenState();
 }
 
-/// The State class for the SignInScreen widget. Manages the screen's state,
-/// including input controllers and the sign-in process status.
 class SignInScreenState extends State<SignInScreen> {
-  // Logger instance for logging events specific to this screen.
   final _log = Logger('SignInScreen');
-  // Text editing controllers to manage the input fields.
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
-  // Boolean flag to track if a sign-in attempt is currently in progress.
-  // Used to disable buttons and show a loading indicator.
   bool _isSigningIn = false;
-
-  // Get an instance of the push notification service
-  // Consider using Provider or GetIt for better dependency injection in larger apps
   final PushNotificationService _pushNotificationService = PushNotificationService();
 
   @override
   void initState() {
     super.initState();
-    // Initialize the logger for this screen when the state is created.
     LoggingUtils.setupLogger(_log);
   }
 
-  /// Attempts to sign the user in by:
-  /// 1. Validating input.
-  /// 2. Calling the backend login API.
-  /// 3. Handling the API response (success or failure).
-  /// 4. Updating the global AuthState (including version check).
-  /// 5. Updating local database records (profile, game progress).
-  /// 6. Getting/Sending the FCM token.
-  /// 7. Navigating the user accordingly.
   Future<void> _signIn() async {
-    // Exit if the widget is no longer mounted or if a sign-in is already happening.
     if (!mounted || _isSigningIn) return;
+    setState(() { _isSigningIn = true; });
 
-    // Update the UI to show the loading state.
-    setState(() {
-      _isSigningIn = true;
-    });
-
-    // Retrieve username and password from the text controllers.
     final username = _usernameController.text.trim();
     final password = _passwordController.text;
 
-    // Validate that both username and password fields are filled.
     if (username.isEmpty || password.isEmpty) {
       _showSnackBar('Please enter both username and password.');
-      // Reset loading state and exit.
       setState(() => _isSigningIn = false);
       return;
     }
 
-    // Construct the URL for the login API endpoint.
     final url = Uri.https('governance.page', '/wp-json/apigold/v1/login');
 
     try {
       _log.info("Attempting sign in for user: $username");
-      // Perform the POST request to the login API endpoint.
       final response = await http.post(
         url,
-        headers: {
-          'Content-Type': 'application/json', // Specify JSON content type.
-        },
-        body: jsonEncode({ // Send username and password in the request body as JSON.
-          'username': username,
-          'password': password,
-        }),
-      ).timeout(const Duration(seconds: 15)); // Apply a 15-second timeout.
+        headers: { 'Content-Type': 'application/json' },
+        body: jsonEncode({ 'username': username, 'password': password }),
+      ).timeout(const Duration(seconds: 15));
 
-      // After the await, check if the widget is still mounted before proceeding.
       if (!mounted) return;
 
-      // Decode the JSON response from the API.
       final responseData = json.decode(response.body);
 
-      // Check for a successful response (HTTP 200) and a success code within the response body.
       if (response.statusCode == 200 && responseData['code'] == 'success') {
         _log.info('Sign in successful: $responseData');
-
-        // Extract the user data payload from the response.
         final data = responseData['data'];
-        // Ensure the data payload exists and is a Map.
         if (data == null || data is! Map) {
           _log.severe('Sign in response missing or invalid "data" field.');
           _showSnackBar('Sign in failed: Invalid response from server.');
@@ -123,7 +69,6 @@ class SignInScreenState extends State<SignInScreen> {
           return;
         }
 
-        // Extract specific user details from the data payload.
         final userId = data['user_id'];
         final accountStatus = data['account_status'];
         final membershipLevel = data['membership_level'];
@@ -131,8 +76,6 @@ class SignInScreenState extends State<SignInScreen> {
         final minimumRequiredVersionStr = data['app_version'];
         _log.fine("Extracted minimum required version from API: $minimumRequiredVersionStr");
 
-
-        // --- Validate Extracted Data ---
         if (userId == null || userId is! int ||
             accountStatus == null || accountStatus is! String || accountStatus.isEmpty ||
             membershipLevel == null || membershipLevel is! String || membershipLevel.isEmpty ||
@@ -144,141 +87,280 @@ class SignInScreenState extends State<SignInScreen> {
           setState(() => _isSigningIn = false);
           return;
         }
-        final String userIdStr = userId.toString(); // Use String for consistency
-        // --- End Data Validation ---
+        final String userIdStr = userId.toString();
 
-
-        // --- Update AuthState (now async and includes version) ---
         final authState = context.read<AuthState>();
         await authState.setSignInStatus(
           signedIn: true,
           accountStatus: accountStatus,
           membershipLevel: membershipLevel,
-          userId: userIdStr, // Pass String userId
+          userId: userIdStr,
           authToken: authToken,
-          gameDrawData: [], // Placeholder for game draw data.
-          minimumRequiredVersionStr: minimumRequiredVersionStr, // Pass the extracted version
+          gameDrawData: [],
+          minimumRequiredVersionStr: minimumRequiredVersionStr,
         );
         _log.info("AuthState updated. Requires update flag set to: ${authState.requiresUpdate}");
 
-
-        // --- Update Local Database ---
+        if (accountStatus == "subscriber") {
+          if (mounted) {
+            showDialog(
+              context: context,
+              barrierDismissible: false,
+              builder: (context) => AlertDialog(
+                title: Text('Account Not Verified'),
+                content: Text('Your account is not verified. Please check your email. You will be logged out.'),
+              ),
+            );
+            Future.delayed(Duration(seconds: 2), () async {
+              Navigator.of(context, rootNavigator: true).pop(); // close dialog
+              final authState = context.read<AuthState>();
+              await authState.signOut();
+              if (mounted) {
+                Navigator.of(context).pushNamedAndRemoveUntil(
+                  SignInScreen.routeName,
+                  (route) => false,
+                );
+              }
+            });
+          }
+          setState(() => _isSigningIn = false);
+          return;
+        }
         try {
           final dbHelper = DatabaseHelper();
-          await dbHelper.insertOrUpdateUserProfile(
-              userId: userId,
-              membershipLevel: membershipLevel,
-              globalAwards: [], // Initialize empty lists/maps as needed.
-              globalStatistics: '{}'
+          await Future.delayed(const Duration(milliseconds: 200));
+          await _createEnhancedProfileFromUserCache(
+            dbHelper: dbHelper,
+            userId: userId,
+            membershipLevel: membershipLevel,
+            authToken: authToken,
           );
           _log.info('Local user profile created/updated for user ID: $userId upon sign-in.');
-
-          const String defaultGameName = "lotto649";
-          final existingProgress = await dbHelper.getUserGameProgress(userId, defaultGameName);
-          if (existingProgress == null) {
-            await dbHelper.upsertUserGameProgress(
-                userId: userId,
-                gameName: defaultGameName,
-                scoreToAdd: 0,
-                gameAwardsToAdd: [],
-                gameStatistics: '{}'
-            );
-            _log.info('Added default game progress ($defaultGameName) for user ID: $userId upon sign-in.');
-          }
         } catch (dbError) {
           _log.severe('Error setting up local profile/progress for user ID $userId during sign-in: $dbError');
           _showSnackBar('Warning: Could not update local profile/game data.');
         }
         _log.info('Local profile/progress updated.');
-        // --- End Local Database Updates ---
 
-
-        // ******** GET AND SEND FCM TOKEN ********
         try {
           _log.info("Attempting to get/send FCM token after login...");
-          // Get the token using the service instance
           String? fcmToken = await _pushNotificationService.getToken();
-
           if (fcmToken != null) {
-            // Send the token to your backend API using the function we defined in push_notification_service.dart
-            // Pass the necessary details from the successful login
             await _pushNotificationService.sendTokenToServer(userIdStr, fcmToken, authToken);
           } else {
             _log.warning("Could not get FCM token after login to send to server.");
-            // Optionally inform the user, but don't block login
             _showSnackBar("Push notifications might not be enabled.");
           }
         } catch (e) {
           _log.severe("Error getting or sending FCM token after login: $e");
-          // Handle error, but don't block login flow
           _showSnackBar("Error setting up push notifications.");
         }
-        // ******** END FCM TOKEN HANDLING ********
 
-
-        // Navigate to the main application screen after successful sign-in.
+        // --- Profile completeness and onboarding navigation ---
+       // await _navigateBasedOnProfileCompleteness(userId);
         _navigateToHomeScreen();
-
+        return;
       } else {
-        // Handle cases where the API call was technically successful (e.g., status 200)
-        // but the response indicates a logical failure (e.g., wrong password).
         final errorMessage = responseData['message'] ?? 'Sign in failed.';
         _log.warning('Failed to sign in. Status: ${response.statusCode}, Message: $errorMessage');
-        _showSnackBar(errorMessage); // Display the error message from the API.
+        _showSnackBar(errorMessage);
       }
     } on TimeoutException {
-      // Handle network timeouts during the API call.
       _log.warning('Sign in timed out.');
       if (mounted) _showSnackBar('Sign in request timed out. Please try again.');
     } catch (e, stacktrace) {
-      // Handle any other exceptions during the sign-in process (e.g., network errors, JSON parsing errors).
       _log.severe('Error signing in: $e', e, stacktrace);
       if (mounted) _showSnackBar('An unexpected error occurred during sign in.');
     } finally {
-      // This block always executes, regardless of success or failure.
-      // Reset the loading state.
       if (mounted) {
-        setState(() {
-          _isSigningIn = false;
-        });
+        setState(() { _isSigningIn = false; });
       }
     }
   }
 
-  /// Navigates the user to the Create Account screen.
-  Future<void> _navigateToCreateAccount() async {
-    // Use named routes for navigation.
-    Navigator.pushNamed(context, Routes.createAccount);
-    _log.info("Navigated to Create Account screen.");
+  Future<void> _createEnhancedProfileFromUserCache({
+    required DatabaseHelper dbHelper,
+    required int userId,
+    required String membershipLevel,
+    required String authToken,
+  }) async {
+    String? primaryGameName = await _getPrimaryGameFromUserData(dbHelper, userId);
+    if (primaryGameName == null) {
+      await dbHelper.insertOrUpdateUserProfile(
+        userId: userId,
+        membershipLevel: membershipLevel,
+        globalAwards: [],
+        globalStatistics: jsonEncode({
+          'profile_created': DateTime.now().toIso8601String(),
+          'profile_version': '1.0',
+          'fallback_profile': true,
+        }),
+      );
+      return;
+    }
+    final gameDrawInfo = await dbHelper.getGameDrawInfo(primaryGameName);
+    final gameRule = await dbHelper.getGameRule(primaryGameName);
+    final gameProgress = await dbHelper.getUserGameProgress(userId, primaryGameName);
+
+    final profileData = {
+      'primary_game': primaryGameName,
+      'next_draw_date': gameDrawInfo?.drawDate,
+      'total_combinations': gameDrawInfo?.totalCombinations,
+      'user_request_limit': gameDrawInfo?.userRequestLimit,
+      'user_score': gameProgress?['game_score'] ?? 0,
+      'profile_created': DateTime.now().toIso8601String(),
+      'cache_populated': gameDrawInfo != null,
+      'profile_version': '2.0',
+      'game_context': {
+        'draw_schedule': gameRule?.drawSchedule,
+        'has_cached_results': await _hasRecentCachedResults(dbHelper, primaryGameName),
+      }
+    };
+    await dbHelper.insertOrUpdateUserProfile(
+      userId: userId,
+      membershipLevel: membershipLevel,
+      globalAwards: [],
+      globalStatistics: jsonEncode(profileData),
+    );
   }
 
-  /// Navigates the user to the main application screen (usually after login)
-  /// and removes all previous routes from the navigation stack, preventing
-  /// the user from navigating back to the login screen.
+  Future<String?> _getPrimaryGameFromUserData(DatabaseHelper dbHelper, int userId) async {
+    try {
+      final userProgress = await dbHelper.getAllUserGameProgress(userId);
+      if (userProgress.isNotEmpty) {
+        userProgress.sort((a, b) => (b['game_score'] ?? 0).compareTo(a['game_score'] ?? 0));
+        return userProgress.first['game_name'] as String?;
+      }
+      final activeGames = await dbHelper.getActiveGamesForUser(userId);
+      if (activeGames.isNotEmpty) return activeGames.first;
+      final db = await dbHelper.database;
+      final recentCacheEntries = await db.query(
+        'game_results_cache',
+        columns: ['game_name'],
+        orderBy: 'fetched_at DESC',
+        limit: 1,
+      );
+      if (recentCacheEntries.isNotEmpty) {
+        return recentCacheEntries.first['game_name'] as String?;
+      }
+      final drawInfoEntries = await db.query(
+        'game_draw_info',
+        columns: ['game_name'],
+        orderBy: 'last_updated DESC',
+        limit: 1,
+      );
+      if (drawInfoEntries.isNotEmpty) {
+        return drawInfoEntries.first['game_name'] as String?;
+      }
+      return null;
+    } catch (e) {
+      _log.warning('Error determining primary game from user data: $e');
+      return null;
+    }
+  }
+
+  Future<bool> _hasRecentCachedResults(DatabaseHelper dbHelper, String gameName) async {
+    try {
+      final db = await dbHelper.database;
+      final recentResults = await db.query(
+        'game_results_cache',
+        where: 'game_name = ? AND fetched_at > ?',
+        whereArgs: [
+          gameName,
+          DateTime.now().subtract(const Duration(days: 7)).toIso8601String()
+        ],
+        limit: 1,
+      );
+      return recentResults.isNotEmpty;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  // --- Profile Completeness Check and Navigation ---
+  Future<void> _navigateBasedOnProfileCompleteness(int userId) async {
+    final completeness = await _getProfileCompleteness(userId);
+
+    if (completeness.isComplete) {
+      _log.info('Profile complete, navigating to main screen');
+      _navigateToHomeScreen();
+    } 
+    // else {
+    //  _log.info('Profile incomplete, navigating to onboarding/profile completion');
+    //  _navigateToProfileCompletion(completeness);
+    // }
+  }
+
+  Future<ProfileCompleteness> _getProfileCompleteness(int userId) async {
+    final dbHelper = DatabaseHelper();
+    final profile = await dbHelper.getUserProfile(userId);
+    if (profile == null) {
+      return ProfileCompleteness.empty();
+    }
+    Map<String, dynamic>? profileData;
+    try {
+      final statsJson = profile['global_statistics'] as String?;
+      profileData = statsJson != null ? jsonDecode(statsJson) : null;
+    } catch (_) {
+      profileData = null;
+    }
+    final userProgress = await dbHelper.getAllUserGameProgress(userId);
+    final activeGames = await dbHelper.getActiveGamesForUser(userId);
+    bool hasGameData = userProgress.isNotEmpty || activeGames.isNotEmpty;
+    bool hasCachedData = false;
+    if (hasGameData) {
+      for (final progress in userProgress) {
+        final gameName = progress['game_name'] as String;
+        final drawInfo = await dbHelper.getGameDrawInfo(gameName);
+        if (drawInfo != null) {
+          hasCachedData = true;
+          break;
+        }
+      }
+    }
+    return ProfileCompleteness(
+      hasBasicInfo: profile['membership_level']?.isNotEmpty ?? false,
+      hasGameSelection: hasGameData,
+      hasCachedGameData: hasCachedData,
+      profileVersion: profileData?['profile_version'] as String?,
+      primaryGame: profileData?['primary_game'] as String?,
+      isDataDriven: profileData?['fallback_profile'] != true,
+    );
+  }
+
   void _navigateToHomeScreen() {
     if (mounted) {
       Navigator.pushNamedAndRemoveUntil(
         context,
-        Routes.main, // The route name of the main screen.
-            (Route<dynamic> route) => false, // This predicate removes all routes below the new route.
+        Routes.main,
+        (Route<dynamic> route) => false,
       );
     }
   }
 
-  /// A utility function to display a short message at the bottom of the screen.
+  // void _navigateToProfileCompletion(ProfileCompleteness completeness) {
+  //  if (mounted) {
+  //    Navigator.pushReplacementNamed(
+  //      context,
+  //      Routes.completeProfile,
+  //      arguments: completeness,
+  //    );
+  //  }
+  // }
+
+  Future<void> _navigateToCreateAccount() async {
+    Navigator.pushNamed(context, Routes.createAccount);
+    _log.info("Navigated to Create Account screen.");
+  }
+
   void _showSnackBar(String text) {
-    // Ensure the widget is still mounted before trying to show the SnackBar.
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(text)),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
     }
   }
 
   @override
   void dispose() {
-    // Clean up the text editing controllers when the widget state is disposed
-    // to prevent memory leaks.
     _usernameController.dispose();
     _passwordController.dispose();
     super.dispose();
@@ -286,49 +368,39 @@ class SignInScreenState extends State<SignInScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Defines the visual structure of the Sign In screen.
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Sign In'),
-      ),
+      appBar: AppBar(title: const Text('Sign In')),
       body: Padding(
-        padding: const EdgeInsets.all(16.0), // Add padding around the content.
+        padding: const EdgeInsets.all(16.0),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center, // Center the column vertically.
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Text field for username or email input.
             TextField(
               controller: _usernameController,
               decoration: const InputDecoration(labelText: 'Username or Email'),
-              keyboardType: TextInputType.emailAddress, // Suggest email keyboard.
-              textInputAction: TextInputAction.next, // Show 'next' button on keyboard.
+              keyboardType: TextInputType.emailAddress,
+              textInputAction: TextInputAction.next,
             ),
-            // Text field for password input.
             TextField(
               controller: _passwordController,
               decoration: const InputDecoration(labelText: 'Password'),
-              obscureText: true, // Hide the entered text.
-              textInputAction: TextInputAction.done, // Show 'done' button on keyboard.
-              onSubmitted: (_) => _signIn(), // Trigger sign-in when 'done' is pressed.
+              obscureText: true,
+              textInputAction: TextInputAction.done,
+              onSubmitted: (_) => _signIn(),
             ),
-            const SizedBox(height: 20), // Vertical spacing.
-            // The main Sign In button.
+            const SizedBox(height: 20),
             ElevatedButton(
-              // Disable the button if a sign-in is in progress (_isSigningIn is true).
               onPressed: _isSigningIn ? null : _signIn,
-              // Conditionally display either a loading indicator or the button text.
               child: _isSigningIn
-                  ? const SizedBox( // Show a small circular progress indicator.
-                  height: 20,
-                  width: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)
-              )
-                  : const Text('Sign In'), // Show the button text.
+                  ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)
+                    )
+                  : const Text('Sign In'),
             ),
-            const SizedBox(height: 16), // Vertical spacing.
-            // Text button to navigate to the account creation screen.
+            const SizedBox(height: 16),
             TextButton(
-              // Disable the button if a sign-in is in progress.
               onPressed: _isSigningIn ? null : _navigateToCreateAccount,
               child: const Text('Create Free Account'),
             ),
@@ -337,4 +409,40 @@ class SignInScreenState extends State<SignInScreen> {
       ),
     );
   }
+}
+
+class ProfileCompleteness {
+  final bool hasBasicInfo;
+  final bool hasGameSelection;
+  final bool hasCachedGameData;
+  final String? profileVersion;
+  final String? primaryGame;
+  final bool isDataDriven;
+
+  ProfileCompleteness({
+    required this.hasBasicInfo,
+    required this.hasGameSelection,
+    required this.hasCachedGameData,
+    this.profileVersion,
+    this.primaryGame,
+    this.isDataDriven = false,
+  });
+
+  bool get isComplete => hasBasicInfo && hasGameSelection && hasCachedGameData;
+  bool get isRichProfile => isDataDriven && primaryGame != null;
+
+  double get completionPercentage {
+    int score = 0;
+    if (hasBasicInfo) score++;
+    if (hasGameSelection) score++;
+    if (hasCachedGameData) score++;
+    if (isDataDriven) score++;
+    return score / 4.0;
+  }
+
+  factory ProfileCompleteness.empty() => ProfileCompleteness(
+    hasBasicInfo: false,
+    hasGameSelection: false,
+    hasCachedGameData: false,
+  );
 }

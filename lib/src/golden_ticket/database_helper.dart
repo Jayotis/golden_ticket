@@ -37,6 +37,7 @@ class UserActiveGame {
       );
 }
 
+
 // --- GameDrawInfo Class Definition ---
 final _logGameDrawInfo = Logger('GameDrawInfo');
 /// Contains information about a specific game draw, including combination limits and request counters.

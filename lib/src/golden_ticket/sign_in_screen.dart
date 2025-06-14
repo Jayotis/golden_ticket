@@ -14,6 +14,7 @@ import '../../push_notification_service.dart';
 class SignInScreen extends StatefulWidget {
   const SignInScreen({super.key});
   static const routeName = '/sign-in';
+  
 
   @override
   SignInScreenState createState() => SignInScreenState();
@@ -25,11 +26,12 @@ class SignInScreenState extends State<SignInScreen> {
   final _passwordController = TextEditingController();
   bool _isSigningIn = false;
   final PushNotificationService _pushNotificationService = PushNotificationService();
-
+  late DatabaseHelper dbHelper;
   @override
   void initState() {
     super.initState();
     LoggingUtils.setupLogger(_log);
+    dbHelper = DatabaseHelper();
   }
 
   Future<void> _signIn() async {
@@ -75,7 +77,8 @@ class SignInScreenState extends State<SignInScreen> {
         final authToken = data['auth_token'];
         final minimumRequiredVersionStr = data['app_version'];
         _log.fine("Extracted minimum required version from API: $minimumRequiredVersionStr");
-
+        
+        final gameSelected = responseData['data']?['game_selected'] as String?;
         if (userId == null || userId is! int ||
             accountStatus == null || accountStatus is! String || accountStatus.isEmpty ||
             membershipLevel == null || membershipLevel is! String || membershipLevel.isEmpty ||
@@ -89,6 +92,13 @@ class SignInScreenState extends State<SignInScreen> {
         }
         final String userIdStr = userId.toString();
 
+        if (gameSelected != null && gameSelected.isNotEmpty) {
+          final activeGames = await dbHelper.getActiveGamesForUser(userId);
+          if (!activeGames.contains(gameSelected)) {
+            await dbHelper.activateGameForUser(userId, gameSelected);
+          }
+        }
+        
         final authState = context.read<AuthState>();
         await authState.setSignInStatus(
           signedIn: true,
